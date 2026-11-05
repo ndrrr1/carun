@@ -1,0 +1,5 @@
+enable
+show interfaces status
+show vlan brief
+show mac address-table
+show cdp neighbors

@@ -1,0 +1,7 @@
+enable
+show ip interface brief
+show ip route
+show ip route static
+show running-config
+show startup-config
+show cdp neighbors
