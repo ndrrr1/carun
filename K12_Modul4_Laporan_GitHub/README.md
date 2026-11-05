@@ -48,8 +48,6 @@ Ruang lingkup laporan ini adalah implementasi **CIDR pada Cisco Packet Tracer**.
 
 ![Screenshot topologi Cisco Packet Tracer](assets/screenshots/topologi-packet-tracer.png)
 
-*Screenshot topologi yang dikirimkan pengguna dari sesi Packet Tracer. Label pada file `.pkt` dalam paket ini telah dirapikan dan pengaturan huruf workspace dinaikkan dari 8 menjadi 12 poin.*
-
 ### Diagram topologi dengan label yang dirapikan
 
 ![Diagram dokumentasi topologi akhir](assets/diagram/topologi-rapi.svg)
