@@ -1,810 +1,317 @@
-# Cara Menjalankan Program
+# K12 - Contekan Demo CIDR
 
-Seluruh langkah dijalankan dari folder utama repository, yaitu folder yang berisi:
+Buka CPT dan spreadsheet. Ikuti urutan di bawah; kotak kutipan berisi kalimat yang bisa dibaca saat demo.
 
-```text
-soal_1  soal_2  soal_3
-```
+## 1. Pembuka
 
-File tambahan yang perlu disiapkan di folder `~/Downloads`:
+Tunjukkan topologi, lalu ucapkan:
 
-```text
-amba_files.zip
-notes.csv.enc
-server
-```
+> “Kami menggunakan CIDR dengan prefix 192.217.x.x. Ada 25 subnet internal. Kebutuhan IP dihitung dari jumlah host ditambah interface router.”
 
-Masuk ke folder hasil extract repository. Contoh jika hasil extract ada di Downloads:
+Cyberia menjadi pintu keluar. Wired menjadi pusat percabangan.
 
-```bash
-cd ~/Downloads/SISOP-4-2026-IT-124-main
-```
+## 2. Jelaskan satu contoh hitungan: A25
 
-Jika nama folder berbeda, sesuaikan dengan lokasi hasil extract. Cek posisi folder:
+Buka tabel A25 pada spreadsheet.
 
-```bash
-ls
-```
-
-Output yang diharapkan:
+> “Lain membutuhkan 57 host dan Mika 4 host. Ditambah satu interface router, totalnya 62. Kami memakai /26 karena menyediakan 62 alamat usable.”
 
 ```text
-soal_1  soal_2  soal_3
+57 + 4 + 1 = 62
+2^6 - 2 = 62
+32 - 6 = /26
 ```
+
+| Yang ditunjukkan | Nilai |
+| --- | --- |
+| Network A25 | 192.217.15.128/26 |
+| Netmask | 255.255.255.192 |
+| Gateway | 192.217.15.129 |
+| IP Lain | 192.217.15.130 |
+| IP Mika | 192.217.15.131 |
+| Broadcast | 192.217.15.191 |
+
+Kalau ditanya “kenapa bukan /27?”: **/27 hanya menyediakan 30 alamat usable, sehingga tidak cukup.**
+
+## 3. Jelaskan pohon CIDR
+
+Buka pohon pada laporan atau sheet Penggabungan - CIDR.
+
+> “Kami menggabungkan subnet dari cabang terluar menuju pusat. Contohnya A25 dan A24 menjadi B1. Penggabungan dilanjutkan sampai blok induk I1, yaitu 192.217.0.0/18.”
+
+```mermaid
+flowchart TD
+    C1["C1 /24"] --> B1["B1 /25"]
+    C1 --> B2["B2 /26"]
+    B1 --> A25["A25 /26"]
+    B1 --> A24["A24 /30"]
+    B2 --> A23["A23 /27"]
+    B2 --> A22["A22 /30"]
+```
+
+Pada pohon alokasi ini, anak ditempatkan pada bagian berbeda di dalam blok induk dan mengikuti batas network. Prefix induk satu tingkat lebih pendek dari prefix anak yang terpendek. Seluruh tahap B-I dapat ditunjukkan pada spreadsheet.
+
+**Ingat:** /18 adalah blok agregat keseluruhan. Mask pada Mika tetap /26.
+
+## 4. Jelaskan routing
+
+Buka **Wired → CLI**. Jalankan per baris:
+
+```text
+enable
+show ip interface brief
+show ip route
+show ip route 192.217.15.131
+```
+
+Lalu ucapkan:
+
+> “IP Mika berada dalam 192.217.0.0/20. Wired mengirimkannya ke 192.217.2.2, yaitu Tachibana. Router berikutnya meneruskan paket sesuai routing masing-masing.”
+
+Baris konfigurasi yang menjelaskan contoh tersebut:
+
+```text
+ip route 192.217.0.0 255.255.240.0 192.217.2.2
+```
+
+Jika ditanya rute balik:
+
+> “Router cabang menggunakan default route ke induknya. Contohnya, default route Shibuya menuju Phantoma.”
+
+Jika ditanya kode routing: **C = connected, L = IP router sendiri, S = static, S* = default static.**
+
+Jika ditanya Null0:
+
+> “Null0 membuang paket ke ruang agregat yang tidak memiliki rute lebih spesifik agar tidak terjadi loop.”
+
+## 5. Jalankan tiga jenis ping internal
+
+### A. Router ke router
+
+Pada **Wired → CLI**:
+
+```text
+ping 192.217.2.2
+```
+
+> “Ini ping dari Wired ke router Tachibana.”
+
+### B. Router ke client
+
+Masih pada **Wired → CLI**:
+
+```text
+ping 192.217.15.131
+```
+
+> “Ini ping dari Wired ke client Mika yang berada di cabang Shibuya.”
+
+### C. Client ke client
+
+Buka **Omnipresence → Desktop → Command Prompt**:
+
+```text
+ipconfig /all
+ping 192.217.24.1
+ping 192.217.15.131
+tracert 192.217.15.131
+```
+
+> “Saya periksa IP client, lalu gateway, kemudian koneksi ke Mika pada subnet berbeda. Tracert dipakai untuk melihat hop yang dilewati.”
+
+Tes arah sebaliknya dari **Mika → Command Prompt**:
+
+```text
+ping 192.217.24.2
+```
+
+## 6. Demo jaringan luar
+
+**File internal awal belum memiliki WAN/NAT yang lengkap.** Siapkan tambahan pada bagian terlipat di bawah sebelum mendemokan langkah ini.
+
+Setelah tambahan WAN/NAT dibuat, dari **Cyberia → CLI**:
+
+```text
+ping 203.0.113.1
+```
+
+Dari **Omnipresence → Command Prompt**:
+
+```text
+ping 198.51.100.10
+```
+
+Segera setelah itu, dari **Cyberia → CLI**:
+
+```text
+show ip nat translations
+show ip nat statistics
+```
+
+> “Trafik client internal diterjemahkan oleh Cyberia menjadi alamat WAN sebelum menuju server luar.”
+
+Target 198.51.100.10 adalah server luar **simulasi di CPT**, bukan bukti akses Internet nyata. Ping dari Cyberia sendiri belum membuktikan NAT client; tampilkan tabel NAT setelah ping dari Omnipresence.
 
 ---
 
-## Requirement Awal
+<details>
+<summary><strong>Tambahan sebelum demo: setup WAN/NAT</strong> — buka hanya ketika menyiapkan jaringan luar</summary>
 
-### A. Update package list
+### Ruang lingkup tambahan WAN
 
-```bash
-sudo apt update
-```
+Pada konfigurasi internal awal, Cyberia Fa0/0 disiapkan sebagai klien DHCP menuju Cloud, dan NAT belum dipasang. Bagian ini adalah **rancangan tambahan yang perlu diterapkan pada salinan file CPT** sebelum demo jaringan luar. Simpan salinan tersebut, misalnya sebagai `CIDR_Demo_WAN.pkt`.
 
-### B. Install dependency FUSE dan compiler
+Jaringan luar pada contoh ini merupakan **simulasi di Packet Tracer**. Server-Luar beralamat 198.51.100.10 adalah perangkat yang dibuat di dalam simulasi; ping ke sana tidak membuktikan akses ke Internet nyata.
 
-```bash
-sudo apt install -y gcc pkg-config libfuse3-dev fuse3
-```
+### Perangkat dan sambungan tambahan
 
-### C. Install dependency Docker, Samba, dan tools tambahan
+Tambahkan satu Cable Modem-PT, satu router 2811 bernama **ISP**, serta satu Server-PT bernama **Server-Luar**. Ganti sambungan WAN langsung Cyberia–Cloud menjadi susunan berikut.
 
-```bash
-sudo apt install -y docker.io smbclient cifs-utils tree zip unzip curl xxd
-```
+| Perangkat/port pertama | Perangkat/port kedua | Kabel |
+| --- | --- | --- |
+| Cyberia FastEthernet0/0 | Ethernet Cable Modem, biasanya Port1 | Ethernet; pilih koneksi otomatis. |
+| Coaxial Cable Modem, biasanya Port0 | Cloud Coaxial7 | Coaxial. |
+| Cloud Ethernet6 | ISP FastEthernet0/0 | Ethernet; pilih koneksi otomatis. |
+| ISP FastEthernet0/1 | Server-Luar FastEthernet0 | Ethernet; pilih koneksi otomatis. |
 
-### D. Aktifkan Docker dan FUSE
+Nama port Cloud pada contoh adalah Ethernet6 dan Coaxial7. Sesuaikan nomor jika Cloud yang digunakan memiliki penomoran berbeda. Cable Modem dan Cloud meneruskan sambungan; proses NAT dilakukan pada Cyberia.
 
-```bash
-sudo systemctl enable --now docker
-```
+### Konfigurasi sambungan Cloud
 
-```bash
-sudo modprobe fuse
-```
+1. Buka **Cloud → Config → Ethernet6**.
+2. Ubah **Provider Network** menjadi **Cable**.
+3. Buka **Connections → Cable**.
+4. Pasangkan **Coaxial7** dengan **Ethernet6**.
+5. Klik **Add**.
 
-### E. Aktifkan konfigurasi `allow_other`
+Pemetaan port tersebut diperlukan agar trafik dapat diteruskan antara sisi modem dan sisi ISP.
 
-```bash
-sudo sed -i 's/^#user_allow_other/user_allow_other/' /etc/fuse.conf
-```
+### Alamat sisi luar
 
-```bash
-grep -q '^user_allow_other' /etc/fuse.conf || echo 'user_allow_other' | sudo tee -a /etc/fuse.conf
-```
+| Perangkat/interface | IP | Subnet mask | Gateway |
+| --- | --- | --- | --- |
+| Cyberia Fa0/0 | 203.0.113.2 | 255.255.255.252 | Default route ke 203.0.113.1 |
+| ISP Fa0/0 | 203.0.113.1 | 255.255.255.252 | - |
+| ISP Fa0/1 | 198.51.100.1 | 255.255.255.0 | - |
+| Server-Luar | 198.51.100.10 | 255.255.255.0 | 198.51.100.1 |
 
----
+Alamat sisi luar ini merupakan contoh tambahan dan tidak mengubah alokasi 25 subnet internal 192.217.x.x.
 
-# Cara Run Soal 1
+### Konfigurasi router ISP
 
-Soal 1 berfokus pada FUSE yang membaca file perjalanan Mas Amba dari `amba_files.zip`, lalu membuat file virtual bernama `tujuan.txt`.
-
-## A. Menyiapkan file ZIP bahan
-
-Masuk ke folder Soal 1:
-
-```bash
-cd soal_1
-```
-
-Lepaskan mount lama jika masih ada:
-
-```bash
-fusermount3 -u mnt 2>/dev/null || true
-```
-
-Bersihkan runtime lama:
-
-```bash
-rm -rf amba_files
-```
-
-```bash
-rm -rf mnt
-```
-
-```bash
-rm -f kenz_rescue
-```
-
-```bash
-rm -f fuse.log
-```
-
-Copy file bahan dari `Downloads` ke folder Soal 1:
-
-```bash
-cp ~/Downloads/amba_files.zip .
-```
-
-Buat mount point:
-
-```bash
-mkdir -p mnt
-```
-
-Cek file bahan:
-
-```bash
-ls
-```
-
-Output minimal yang diharapkan:
+Jalankan pada **ISP → CLI**:
 
 ```text
-amba_files.zip  kenz_rescue.c  mnt
+enable
+configure terminal
+hostname ISP
+
+interface FastEthernet0/0
+ ip address 203.0.113.1 255.255.255.252
+ no shutdown
+ exit
+
+interface FastEthernet0/1
+ ip address 198.51.100.1 255.255.255.0
+ no shutdown
+ exit
+
+end
+copy running-config startup-config
 ```
 
-Unzip file bahan:
+Tekan Enter jika diminta nama file tujuan ketika menyimpan konfigurasi.
 
-```bash
-unzip amba_files.zip
-```
+### Konfigurasi Server-Luar
 
-Cek isi folder bahan:
-
-```bash
-ls amba_files
-```
-
-Output yang diharapkan:
-
-```text
-1.txt  2.txt  3.txt  4.txt  5.txt  6.txt  7.txt
-```
-
-Cek salah satu isi file:
-
-```bash
-cat amba_files/1.txt
-```
-
-File tersebut harus memiliki baris koordinat:
+Buka **Server-Luar → Desktop → IP Configuration → Static**, kemudian masukkan:
 
 ```text
-KOORD: -7.957
+IP address      : 198.51.100.10
+Subnet mask     : 255.255.255.0
+Default gateway : 198.51.100.1
 ```
 
-## B. Compile program Soal 1
+DNS tidak diperlukan untuk command ping yang menggunakan alamat IP langsung.
 
-```bash
-gcc kenz_rescue.c $(pkg-config fuse3 --cflags --libs) -o kenz_rescue
-```
+### Konfigurasi WAN dan NAT pada Cyberia
 
-## C. Jalankan FUSE Soal 1
-
-```bash
-./kenz_rescue amba_files mnt -f > fuse.log 2>&1 &
-```
-
-Tunggu proses mount:
-
-```bash
-sleep 2
-```
-
-## D. Cek hasil Soal 1
-
-Cek isi mount point:
-
-```bash
-ls mnt
-```
-
-Output yang diharapkan:
+Baris `no ip address` di Fa0/0 menghapus pengaturan alamat sebelumnya, kemudian alamat WAN ditetapkan secara statis. Interface internal dan rute internal yang sudah ada tetap digunakan.
 
 ```text
-1.txt  2.txt  3.txt  4.txt  5.txt  6.txt  7.txt  tujuan.txt
+enable
+configure terminal
+
+interface FastEthernet0/0
+ no ip address
+ ip address 203.0.113.2 255.255.255.252
+ ip nat outside
+ no shutdown
+ exit
+
+interface FastEthernet0/1
+ ip nat inside
+ exit
+
+interface FastEthernet1/0
+ ip nat inside
+ exit
+
+access-list 1 permit 192.217.0.0 0.0.63.255
+ip nat inside source list 1 interface FastEthernet0/0 overload
+ip route 0.0.0.0 0.0.0.0 203.0.113.1
+
+end
+copy running-config startup-config
 ```
 
-Cek isi file virtual `tujuan.txt`:
+| Bagian konfigurasi | Penjelasan |
+| --- | --- |
+| Fa0/0: `ip nat outside` | Interface menuju sambungan luar. |
+| Fa0/1: `ip nat inside` | Interface internal yang menuju Wired. |
+| Fa1/0: `ip nat inside` | Interface internal yang menuju LAN Cyberia. |
+| `access-list 1 permit 192.217.0.0 0.0.63.255` | Memilih alamat sumber pada blok internal /18 untuk diterjemahkan. |
+| `interface FastEthernet0/0 overload` | Menggunakan alamat WAN Fa0/0 untuk translasi beberapa perangkat internal. |
+| Default route ke 203.0.113.1 | Mengirim tujuan di luar rute internal menuju router ISP. |
 
-```bash
-cat mnt/tujuan.txt
-```
+Wildcard /18 diperoleh dari `255.255.255.255 - 255.255.192.0 = 0.0.63.255`. Di dalam contoh ini, alamat sumber client diterjemahkan menjadi alamat WAN Cyberia **203.0.113.2**. Overload/PAT membedakan aliran menggunakan informasi protokol; untuk trafik ICMP, identifier ICMP ikut digunakan.
 
-Output yang diharapkan:
+> “Cyberia menjadi batas jaringan internal dan eksternal. Dua interface internal ditandai NAT inside dan interface WAN ditandai NAT outside. NAT overload menerjemahkan sumber internal menggunakan alamat WAN Cyberia.”
 
-```text
-Tujuan Mas Amba: -7.957382728443728,112.4698688227961,23:59 WIB
-```
+Router ISP tidak memerlukan rute ke seluruh subnet internal untuk balasan trafik PAT ini, karena balasan diarahkan ke alamat WAN Cyberia. Cyberia menerjemahkan balasan dan meneruskannya ke jaringan internal menggunakan routing yang sudah tersedia.
 
-Pastikan `tujuan.txt` tidak ada di folder asli:
+### Urutan command demo jaringan luar
 
-```bash
-ls amba_files
-```
-
-Output yang diharapkan:
-
-```text
-1.txt  2.txt  3.txt  4.txt  5.txt  6.txt  7.txt
-```
-
-Stop FUSE Soal 1:
-
-```bash
-fusermount3 -u mnt
-```
-
-Kembali ke root repository:
-
-```bash
-cd ..
-```
-
----
-
-# Cara Run Soal 2
-
-Soal 2 berfokus pada FUSE terenkripsi, file `.enc`, Docker server, dan client.
-
-## A. Menyiapkan encrypted storage, mount point, dan server
-
-Masuk ke folder Soal 2:
-
-```bash
-cd soal_2
-```
-
-Lepaskan mount lama jika masih ada:
-
-```bash
-fusermount3 -u fuse_mount 2>/dev/null || true
-```
-
-Hapus container lama jika ada:
-
-```bash
-sudo docker rm -f db_app 2>/dev/null || true
-```
-
-Bersihkan runtime lama:
-
-```bash
-rm -f fuse
-```
-
-```bash
-rm -f client
-```
-
-```bash
-rm -f fuse.log
-```
-
-```bash
-rm -rf encrypted_storage/*
-```
-
-```bash
-rm -rf fuse_mount/*
-```
-
-Buat folder backend untuk file terenkripsi:
-
-```bash
-mkdir -p encrypted_storage/tests
-```
-
-Buat folder mount point:
-
-```bash
-mkdir -p fuse_mount
-```
-
-Copy file `notes.csv.enc` dari `Downloads` ke backend:
-
-```bash
-cp ~/Downloads/notes.csv.enc encrypted_storage/tests/notes.csv.enc
-```
-
-Copy file `server` dari `Downloads` ke folder Soal 2:
-
-```bash
-cp ~/Downloads/server ./server
-```
-
-Beri permission executable pada `server`:
-
-```bash
-chmod +x server
-```
-
-Cek file penting:
-
-```bash
-ls encrypted_storage/tests
-```
-
-Output yang diharapkan:
+Pertama, dari **Cyberia → CLI**:
 
 ```text
-notes.csv.enc
+enable
+show ip interface brief
+show ip route
+ping 203.0.113.1
+ping 198.51.100.10
 ```
 
-Cek file server:
-
-```bash
-ls -l server
-```
-
-Output harus menunjukkan file `server` sudah ada dan executable.
-
-## B. Compile program FUSE dan client
-
-Compile FUSE:
-
-```bash
-gcc fuse.c $(pkg-config fuse3 --cflags --libs) -o fuse
-```
-
-Compile client:
-
-```bash
-gcc client.c -o client
-```
-
-Cek hasil compile:
-
-```bash
-ls
-```
-
-Output minimal yang diharapkan terdapat:
+Lalu dari **Omnipresence → Desktop → Command Prompt**:
 
 ```text
-client  fuse  server
+ping 203.0.113.1
+ping 198.51.100.10
+tracert 198.51.100.10
 ```
 
-## C. Jalankan FUSE dan cek enkripsi/dekripsi
-
-Jalankan FUSE:
-
-```bash
-./fuse encrypted_storage fuse_mount -o allow_other -f > fuse.log 2>&1 &
-```
-
-Tunggu proses mount:
-
-```bash
-sleep 2
-```
-
-Cek file yang muncul di mount point:
-
-```bash
-ls fuse_mount/tests
-```
-
-Output yang diharapkan:
+Segera setelah ping dari client, tampilkan pada **Cyberia → CLI**:
 
 ```text
-notes.csv
+show ip nat translations
+show ip nat statistics
 ```
 
-Cek isi file hasil decrypt:
+> “Ping dari Cyberia memeriksa koneksi sisi WAN. Ping dari Omnipresence memeriksa perjalanan trafik internal ke jaringan luar melalui NAT. Tabel translasi digunakan untuk menunjukkan perubahan alamat sumber client menjadi alamat WAN Cyberia.”
 
-```bash
-cat fuse_mount/tests/notes.csv
-```
-
-Output yang diharapkan:
-
-```text
-author,notes
-admin,TEST_SUCCESS
-```
-
-Buat file uji baru lewat mount point:
-
-```bash
-echo "halo database" > fuse_mount/test.txt
-```
-
-Baca file uji:
-
-```bash
-cat fuse_mount/test.txt
-```
-
-Output yang diharapkan:
-
-```text
-halo database
-```
-
-Cek file asli di backend:
-
-```bash
-ls encrypted_storage
-```
-
-Output minimal yang diharapkan:
-
-```text
-test.txt.enc  tests
-```
-
-Cek isi file terenkripsi:
-
-```bash
-xxd encrypted_storage/test.txt.enc
-```
-
-Isi file seharusnya tidak terbaca sebagai teks normal.
-
-## D. Jalankan Docker server dan client
-
-Build Docker image:
-
-```bash
-sudo docker build -t soal-2-modul-4-sisop .
-```
-
-Jalankan container server:
-
-```bash
-sudo docker run -d --name db_app -p 9000:9000 -v "$(pwd)/fuse_mount:/app/db" soal-2-modul-4-sisop
-```
-
-Cek container:
-
-```bash
-sudo docker ps
-```
-
-Output yang diharapkan terdapat container:
-
-```text
-db_app
-```
-
-Cek log server:
-
-```bash
-sudo docker logs db_app
-```
-
-Jalankan client:
-
-```bash
-./client 127.0.0.1 9000
-```
-
-Output awal yang diharapkan:
-
-```text
-Connected to DB Server on 127.0.0.1:9000
-Type EXIT to quit.
-db>
-```
-
-Di dalam client, coba command:
-
-```text
-HELP
-```
-
-Untuk keluar dari client:
-
-```text
-EXIT
-```
-
-Stop container Soal 2:
-
-```bash
-sudo docker rm -f db_app
-```
-
-Stop FUSE Soal 2:
-
-```bash
-fusermount3 -u fuse_mount
-```
-
-Kembali ke root repository:
-
-```bash
-cd ..
-```
-
----
-
-# Cara Run Soal 3
-
-Soal 3 berfokus pada Samba server, user/group, permission share, persistence data, dan logging.
-
-## A. Menyiapkan folder volume dan permission
-
-Masuk ke folder Soal 3:
-
-```bash
-cd soal_3
-```
-
-Buat folder `docs`:
-
-```bash
-mkdir -p data/docs
-```
-
-Buat folder `ebooks`:
-
-```bash
-mkdir -p data/ebooks
-```
-
-Buat folder `papers`:
-
-```bash
-mkdir -p data/papers
-```
-
-Buat folder `sourcecode`:
-
-```bash
-mkdir -p data/sourcecode
-```
-
-Buat folder log:
-
-```bash
-mkdir -p logs
-```
-
-Buat file log utama:
-
-```bash
-touch logs/libraryit.log
-```
-
-Beri permission executable pada `entrypoint.sh`:
-
-```bash
-chmod +x entrypoint.sh
-```
-
-Matikan Samba host agar port 445 tidak bentrok:
-
-```bash
-sudo systemctl stop smbd nmbd 2>/dev/null || true
-```
-
-## B. Build dan jalankan Docker Compose
-
-Hapus container lama jika ada:
-
-```bash
-sudo docker rm -f libraryit-server 2>/dev/null || true
-```
-
-```bash
-sudo docker rm -f libraryit-logger 2>/dev/null || true
-```
-
-Matikan compose lama jika ada:
-
-```bash
-sudo docker compose down --remove-orphans 2>/dev/null || true
-```
+Ping dari Cyberia sendiri belum membuktikan translasi trafik client. Untuk menunjukkan PAT, kirim ping dari client internal lalu segera periksa tabel NAT karena entri ICMP dapat kedaluwarsa.
 
-Build image:
+</details>
 
-```bash
-sudo docker compose build --no-cache
-```
-
-Jalankan container:
-
-```bash
-sudo docker compose up -d
-```
-
-Tunggu container siap:
-
-```bash
-sleep 5
-```
-
-Cek container:
-
-```bash
-sudo docker ps
-```
-
-Output yang diharapkan terdapat:
-
-```text
-libraryit-server
-libraryit-logger
-```
-
-## C. Tes akses user dan permission share
-
-Tes daftar share sebagai `member`:
-
-```bash
-smbclient -L //127.0.0.1 -U member --password='member123' -m SMB3
-```
-
-Output yang diharapkan:
-
-```text
-docs
-ebooks
-papers
-IPC$
-```
-
-Share `sourcecode` tidak muncul untuk `member`.
-
-Tes anonymous access:
-
-```bash
-smbclient -L //127.0.0.1 -N -m SMB3
-```
-
-Hasil yang diharapkan: anonymous access gagal.
-
-Tes member membaca `docs`:
-
-```bash
-smbclient //127.0.0.1/docs -U member --password='member123' -m SMB3 -c "ls"
-```
-
-Buat file testing untuk `ebooks`:
-
-```bash
-echo "test ebook" > ~/test_ebook.txt
-```
-
-Upload file ke `ebooks` sebagai contributor:
-
-```bash
-smbclient //127.0.0.1/ebooks -U contributor --password='contrib456' -m SMB3 -c "put $HOME/test_ebook.txt test_ebook.txt; ls"
-```
-
-Buat file testing untuk `papers`:
-
-```bash
-echo "test paper" > ~/test_paper.txt
-```
-
-Upload file ke `papers` sebagai contributor:
-
-```bash
-smbclient //127.0.0.1/papers -U contributor --password='contrib456' -m SMB3 -c "put $HOME/test_paper.txt test_paper.txt; ls"
-```
-
-Buat file testing untuk `docs`:
-
-```bash
-echo "dokumen librarian" > ~/test_docs.txt
-```
-
-Upload file ke `docs` sebagai librarian:
-
-```bash
-smbclient //127.0.0.1/docs -U librarian --password='lib789' -m SMB3 -c "put $HOME/test_docs.txt test_docs.txt; ls"
-```
-
-Buat file testing contributor untuk `docs`:
-
-```bash
-echo "dokumen contributor" > ~/contributor_docs.txt
-```
-
-Tes contributor tidak bisa menulis ke `docs`:
+Referensi teknis: [CIDR](https://www.rfc-editor.org/rfc/rfc4632.html), [Cloud Packet Tracer](https://tutorials.ptnetacad.net/help/default/config_clouds.htm), dan [NAT Cisco](https://www.cisco.com/c/en/us/support/docs/ip/network-address-translation-nat/13778-9.html).
 
-```bash
-smbclient //127.0.0.1/docs -U contributor --password='contrib456' -m SMB3 -c "put $HOME/contributor_docs.txt contributor_docs.txt; ls"
-```
-
-Output yang diharapkan:
-
-```text
-NT_STATUS_ACCESS_DENIED
-```
-
-atau upload gagal.
-
-Tes member tidak bisa akses `sourcecode`:
-
-```bash
-smbclient //127.0.0.1/sourcecode -U member --password='member123' -m SMB3 -c "ls"
-```
-
-Output yang diharapkan:
-
-```text
-NT_STATUS_ACCESS_DENIED
-```
-
-Buat file testing untuk `sourcecode`:
-
-```bash
-echo "print('hello sourcecode')" > ~/main.py
-```
-
-Upload file ke `sourcecode` sebagai contributor:
-
-```bash
-smbclient //127.0.0.1/sourcecode -U contributor --password='contrib456' -m SMB3 -c "put $HOME/main.py main.py; ls"
-```
-
-## D. Cek persistence dan logging
-
-Cek persistence data:
-
-```bash
-sudo find data -type f
-```
-
-Output yang diharapkan setelah testing:
-
-```text
-data/ebooks/test_ebook.txt
-data/papers/test_paper.txt
-data/docs/test_docs.txt
-data/sourcecode/main.py
-```
-
-Artinya data berhasil tersimpan di folder host `data`, bukan hanya di dalam container.
-
-Cek log final:
-
-```bash
-cat logs/libraryit.log | tail -30
-```
-
-Cek log container logger:
-
-```bash
-sudo docker logs libraryit-logger --tail=30
-```
-
-Format log yang diharapkan:
-
-```text
-[YYYY-MM-DD HH:MM:SS] [INFO] [username] [AKSI] [file/share]
-[YYYY-MM-DD HH:MM:SS] [WARNING] [username] [DENIED] [file/share]
-```
-
-Stop Soal 3:
-
-```bash
-sudo docker compose down
-```
-
-Kembali ke root repository:
-
-```bash
-cd ..
-```
-
----
-
-# Bersih-Bersih Semua Hasil Run
-
-Command ini dijalankan dari folder utama repository, yaitu folder yang berisi `soal_1`, `soal_2`, dan `soal_3`.
-
-```bash
-bash -lc 'set +e; fusermount3 -u soal_1/mnt 2>/dev/null || true; fusermount3 -u soal_2/fuse_mount 2>/dev/null || true; sudo docker rm -f db_app libraryit-server libraryit-logger 2>/dev/null || true; (cd soal_3 && sudo docker compose down --remove-orphans 2>/dev/null || sudo docker-compose down --remove-orphans 2>/dev/null || true); rm -rf soal_1/amba_files soal_1/mnt soal_1/kenz_rescue soal_1/fuse.log soal_1/amba_files.zip; rm -f soal_2/fuse soal_2/client soal_2/fuse.log; sudo rm -rf soal_2/encrypted_storage/* soal_2/fuse_mount/*; sudo rm -rf soal_3/data/docs/* soal_3/data/ebooks/* soal_3/data/papers/* soal_3/data/sourcecode/* soal_3/logs/*; mkdir -p soal_2/encrypted_storage soal_2/fuse_mount soal_3/data/docs soal_3/data/ebooks soal_3/data/papers soal_3/data/sourcecode soal_3/logs; touch soal_3/logs/libraryit.log; sudo chown -R "$USER:$USER" soal_3/data soal_3/logs soal_2/encrypted_storage soal_2/fuse_mount 2>/dev/null || true; chmod 755 soal_2/encrypted_storage soal_2/fuse_mount soal_3/data soal_3/data/docs soal_3/data/ebooks soal_3/data/papers soal_3/data/sourcecode soal_3/logs; chmod 644 soal_3/logs/libraryit.log; echo "Cleanup selesai. Repository sudah bersih dari hasil runtime."'
-```
-
-Setelah cleanup, cek struktur folder:
-
-```bash
-tree
-```
-
-Catatan: command cleanup ini hanya membersihkan hasil run di folder repository. File berikut tetap aman di `Downloads`:
-
-```text
-~/Downloads/amba_files.zip
-~/Downloads/notes.csv.enc
-~/Downloads/server
-```
